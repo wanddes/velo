@@ -1,25 +1,92 @@
-import { test, expect } from '@playwright/test'
+import { test } from '@playwright/test'
 
-/// AAA - Arrange, Act, Assert
+import { generateOrderCode } from '../support/helpers'
 
-test('deve consultar um pedido aprovado', async ({ page }) => {
-  // Arrange
-  await page.goto('http://localhost:5173/')
-  await expect(page.getByTestId('hero-section').getByRole('heading')).toContainText('Velô Sprint')
+import { Navbar } from '../support/components/Navbar'
 
-  await page.getByRole('link', { name: 'Consultar Pedido' }).click()
-  await expect(page.getByRole('heading')).toContainText('Consultar Pedido')
+import { LandingPage } from '../support/pages/LandingPage'
+import { OrderLockupPage, OrderDetails } from '../support/pages/OrderLockupPage'
 
+test.describe('Consulta de Pedido', () => {
 
-  // Act
-  await page.getByRole('textbox', { name: 'Número do Pedido' }).fill('VLO-GKZL1U')
-  await page.getByRole('button', { name: 'Buscar Pedido' }).click()
+  let orderLockupPage: OrderLockupPage
 
-  // Assert
-  await expect(page.getByText('VLO-GKZL1U')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('VLO-GKZL1U')).toContainText('VLO-GKZL1U')
+  test.beforeEach(async ({ page }) => {
+    await new LandingPage(page).goto()
+    await new Navbar(page).orderLockupLink()
 
-  await expect(page.getByText('APROVADO')).toBeVisible()
-  await expect((page.getByText('APROVADO'))).toContainText('APROVADO')
+    orderLockupPage = new OrderLockupPage(page)
+    orderLockupPage.validatePageLoaded()
+  })
 
+  test('deve consultar um pedido aprovado', async ({ page }) => {
+    const order: OrderDetails = {
+      number: 'VLO-6E2J20',
+      status: 'APROVADO',
+      color: 'Lunar White',
+      wheels: 'aero Wheels',
+      customer: {
+        name: 'Fernando Papito',
+        email: 'papito@velo.dev'
+      },
+      payment: 'À Vista'
+    }
+
+    await orderLockupPage.searchOrder(order.number)
+
+    await orderLockupPage.validateOrderDetails(order)
+    await orderLockupPage.validateStatusBadge(order.status)
+  })
+
+  test('deve consultar um pedido reprovado', async ({ page }) => {
+    const order: OrderDetails = {
+      number: 'VLO-0LNFEA',
+      status: 'REPROVADO',
+      color: 'Midnight Black',
+      wheels: 'sport Wheels',
+      customer: {
+        name: 'Steve Jobs',
+        email: 'jobs@apple.com'
+      },
+      payment: 'À Vista'
+    }
+
+    await orderLockupPage.searchOrder(order.number)
+
+    await orderLockupPage.validateOrderDetails(order)
+    await orderLockupPage.validateStatusBadge(order.status)
+  })
+
+  test('deve consultar um pedido em analise', async ({ page }) => {
+    const order: OrderDetails = {
+      number: 'VLO-412O06',
+      status: 'EM_ANALISE',
+      color: 'Lunar White',
+      wheels: 'aero Wheels',
+      customer: {
+        name: 'João da Silva',
+        email: 'joao@velo.dev'
+      },
+      payment: 'À Vista'
+    }
+
+    await orderLockupPage.searchOrder(order.number)
+
+    await orderLockupPage.validateOrderDetails(order)
+    await orderLockupPage.validateStatusBadge(order.status)
+  })
+
+  test('deve exibir mensagem quando o pedido não é encontrado', async ({ page }) => {
+    const order = generateOrderCode()
+
+    await orderLockupPage.searchOrder(order)
+    await orderLockupPage.validateOrderNotFound()
+  })
+
+  test('deve exibir mensagem quando o código do pedido está fora do padrão', async ({ page }) => {
+    const orderCode = 'XYZ-999-INVALIDO'
+
+    await orderLockupPage.searchOrder(orderCode)
+    await orderLockupPage.validateOrderNotFound()
+  })
 })
