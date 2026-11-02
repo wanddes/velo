@@ -24,4 +24,32 @@ test.describe('Configuração do Veículo', () => {
     await app.configurator.expectPrice('R$ 40.000,00')
     await app.configurator.expectCarImageSrc('/src/assets/glacier-blue-aero-wheels.png')
   })
+
+  test('deve atualizar o preço ao marcar e desmarcar os opcionais', async ({ app }) => {
+    await app.configurator.expectPrice('R$ 40.000,00')
+
+    await app.configurator.checkOptional('Precision Park')
+    await app.configurator.expectPrice('R$ 45.500,00')
+
+    await app.configurator.checkOptional('Flux Capacitor')
+    await app.configurator.expectPrice('R$ 50.500,00')
+
+    await app.configurator.uncheckOptional('Precision Park')
+    await app.configurator.expectPrice('R$ 45.000,00')
+
+    await app.configurator.uncheckOptional('Flux Capacitor')
+    await app.configurator.expectPrice('R$ 40.000,00')
+  })
+
+  test('deve levar os opcionais e o preço para o checkout', async ({ app }) => {
+    await app.configurator.checkOptional('Precision Park')
+    await app.configurator.checkOptional('Flux Capacitor')
+    await app.configurator.expectPrice('R$ 50.500,00')
+
+    await app.configurator.goToCheckout()
+
+    await app.checkout.expectSummaryItem('Precision Park', '+ R$ 5.500,00')
+    await app.checkout.expectSummaryItem('Flux Capacitor', '+ R$ 5.000,00')
+    await app.checkout.expectTotalPrice('R$ 50.500,00')
+  })
 })
