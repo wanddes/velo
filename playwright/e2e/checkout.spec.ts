@@ -1,4 +1,5 @@
 import { test, expect } from '../support/fixtures'
+import { deleteOrdersByCpf } from '../support/database/orderRepository'
 
 
 test.describe('Checkout', () => {
@@ -135,6 +136,8 @@ test.describe('Checkout', () => {
         paymentMethod: 'À Vista',
         totalPrice: 'R$ 40.000,00'
       }
+
+      await deleteOrdersByCpf(customer.document)
 
       // Arrange
       await page.goto('/')

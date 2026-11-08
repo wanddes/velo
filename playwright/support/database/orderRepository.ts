@@ -1,3 +1,5 @@
+import { sql } from 'kysely'
+
 import { db } from './database'
 import { OrderTable } from './schema'
 
@@ -39,4 +41,14 @@ export async function insertOrder(order: OrderDetails) {
 
 export async function deleteOrderByNumber(orderNumber: string) {
   await db.deleteFrom('orders').where('order_number', '=', orderNumber).execute()
+}
+
+// O app grava o CPF com máscara (000.000.000-00), então a comparação é feita só pelos dígitos.
+export async function deleteOrdersByCpf(cpf: string) {
+  const digits = cpf.replace(/\D/g, '')
+
+  await db
+    .deleteFrom('orders')
+    .where(sql<string>`regexp_replace(customer_cpf, '\\D', '', 'g')`, '=', digits)
+    .execute()
 }
