@@ -102,6 +102,18 @@ As variáveis `VITE_SUPABASE_*` são gravadas no JavaScript durante o build. Por
 3. **Run E2E Tests**: Playwright contra a URL de preview e o banco Preview (`DATABASE_URL_PREVIEW`).
 4. **Build & Deploy Vercel Production**: só depois dos E2E, um build novo com as variáveis do ambiente Production da Vercel (Supabase Production) e deploy em produção.
 
+#### Decisão: build de produção em vez de `vercel promote`
+
+O pipeline antigo promovia para produção o mesmo deploy gerado como preview. Isso não serve com dois bancos:
+
+- As variáveis `VITE_*` viram strings literais no JavaScript durante o `vercel build`. O deploy de preview carrega o Supabase Preview e não muda de banco só por receber o domínio de produção.
+- Pela documentação da Vercel, promover um deploy de preview gera um novo deploy de produção. Como o deploy é feito com `--prebuilt` (só o resultado do build é enviado), não há garantia de qual conjunto de variáveis o artefato final usaria.
+
+Caminhos avaliados:
+
+1. **Promover a preview**: produção ficaria com o Supabase Preview ou com um artefato diferente do testado. Descartado.
+2. **Build e deploy próprios de produção depois dos E2E** (escolhido): `vercel pull --environment=production`, `vercel build --prod` e `vercel deploy --prebuilt --prod`, a partir do mesmo commit e do mesmo `yarn.lock` testados. Muda só a configuração do ambiente, e a conferência do build garante que produção aponta para o Supabase de produção.
+
 Travas automáticas:
 
 - `scripts/check-supabase-target.mjs` confere, depois de cada build, se o JavaScript gerado aponta para o Supabase certo e falha o pipeline se encontrar o outro.
