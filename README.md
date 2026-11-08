@@ -61,24 +61,58 @@ VITE_SUPABASE_URL="https://seu_project_id.supabase.co"
 
 > Encontre essas informações em: **Project Settings → API**
 
-### 3. Deploy (banco + functions)
+### 3. Ambientes: Preview e Production
+
+O projeto usa dois projetos Supabase independentes:
+
+| Ambiente | Projeto Supabase | Quem usa |
+|---|---|---|
+| Production | `awfboglgxrbepqxkzyim` (velô) | site publicado em produção |
+| Preview | `zyeydgzpinrxuzrozfvc` (velo-preview) | deploys de preview, testes E2E e desenvolvimento local |
+
+As migrações em `supabase/migrations` são a fonte de verdade dos dois bancos.
+
+### 4. Deploy (banco + functions)
+
+Confira sempre qual projeto está vinculado antes de aplicar qualquer mudança (`supabase/.temp/project-ref`).
+Na versão 3 do CLI, o `db push` precisa de `--remote` para atuar no projeto vinculado.
 
 ```bash
 # Instalar CLI
 yarn add supabase -D
 
-# Login e vincular projeto
+# Login e vincular o projeto desejado (Preview no exemplo)
 yarn supabase login
-yarn supabase link --project-ref awfboglgxrbepqxkzyim
+yarn supabase link --project-ref zyeydgzpinrxuzrozfvc
 
-# Aplicar migrações (cria tabelas e RLS)
-yarn supabase db push
+# Simular e aplicar migrações (cria tabelas e RLS)
+yarn supabase db push --remote --dry-run
+yarn supabase db push --remote
 
 # Deploy das Edge Functions
-yarn supabase functions deploy
+yarn supabase functions deploy credit-analysis --remote=zyeydgzpinrxuzrozfvc --use-api
 ```
 
-Pronto! O banco e as functions estarão configurados.
+### 5. Pipeline (`.github/workflows/cd.yml`)
+
+As variáveis `VITE_SUPABASE_*` são gravadas no JavaScript durante o build. Por isso cada ambiente tem o seu build:
+
+1. **Unit Tests**: testes unitários com Vitest.
+2. **Build & Deploy Vercel Preview**: build com as variáveis do ambiente Preview da Vercel (Supabase Preview) e deploy de preview.
+3. **Run E2E Tests**: Playwright contra a URL de preview e o banco Preview (`DATABASE_URL_PREVIEW`).
+4. **Build & Deploy Vercel Production**: só depois dos E2E, um build novo com as variáveis do ambiente Production da Vercel (Supabase Production) e deploy em produção.
+
+Travas automáticas:
+
+- `scripts/check-supabase-target.mjs` confere, depois de cada build, se o JavaScript gerado aponta para o Supabase certo e falha o pipeline se encontrar o outro.
+- `playwright/support/guards/environmentGuard.ts` interrompe os testes E2E se `DATABASE_URL` ou `BASE_URL` apontarem para produção.
+
+Configuração necessária:
+
+- **Vercel → Settings → Environment Variables**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PROJECT_ID` e `VITE_SUPABASE_PUBLISHABLE_KEY` com os valores de produção em **Production** e os do Preview em **Preview**.
+- **GitHub → Settings → Secrets and variables → Actions**:
+  - Secrets: `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_ORG_ID`, `DATABASE_URL_PREVIEW`, `TD_TOKEN`.
+  - Variables: `SUPABASE_PREVIEW_PROJECT_ID`, `SUPABASE_PROD_PROJECT_ID` e, opcionalmente, `PRODUCTION_URL`.
 
 ---
 

@@ -16,6 +16,9 @@ env:
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_SCOPE: wanddes
+  # Refs dos projetos Supabase (não são secretos), usados nas travas de ambiente
+  SUPABASE_PREVIEW_PROJECT_ID: ${{ vars.SUPABASE_PREVIEW_PROJECT_ID }}
+  SUPABASE_PROD_PROJECT_ID: ${{ vars.SUPABASE_PROD_PROJECT_ID }}
 
 jobs:
   unit-tests:
@@ -79,7 +82,11 @@ jobs:
       - name: Build Vercel
         run: yarn vercel build --token=$VERCEL_TOKEN
 
-      # 7. Deploy preview no vercel
+      # 7. Garante que o build de preview aponta para o Supabase Preview
+      - name: Verify Supabase target (preview)
+        run: node scripts/check-supabase-target.mjs --dir .vercel/output --expect "$SUPABASE_PREVIEW_PROJECT_ID" --forbid "$SUPABASE_PROD_PROJECT_ID"
+
+      # 8. Deploy preview no vercel
       - name: Deploy preview
         id: deploy
         run: |
@@ -120,7 +127,8 @@ jobs:
         run: yarn playwright test
         env:
           BASE_URL: ${{ needs.build-and-deploy.outputs.deployment-url }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
           TESTDINO_TOKEN: ${{ secrets.TD_TOKEN }}
 
       # 7. Relatório de Testes Automatizados
@@ -131,15 +139,45 @@ jobs:
           name: playwright-report
           path: playwright-report
 
-  promote:
-    name: Promote to Production
-    needs: [build-and-deploy, e2e-tests]
+  # Substitui o "vercel promote": as variáveis VITE_* ficam gravadas no build, então
+  # produção precisa de um build próprio, feito com as variáveis do ambiente Production
+  # da Vercel (Supabase Production). Roda só se os testes E2E da prévia passarem.
+  deploy-production:
+    name: Build & Deploy Vercel Production
+    needs: [e2e-tests]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Vercel promote
-        run: |
-          npx vercel@latest promote ${{ needs.build-and-deploy.outputs.deployment-url }} \
-          --token=$VERCEL_TOKEN \
-          --scope=$VERCEL_SCOPE \
-          --yes
+      # 1. Faz checkout do código do repositório
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      # 2. Configura o ambiente Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # 3. Habilita o Corepack para gerenciamento do Yarn
+      - name: Enable Corepack
+        run: corepack enable
+
+      # 4. Instala as dependências do projeto
+      - name: Install dependencies
+        run: yarn install
+
+      # 5. Obter as configurações de produção do vercel
+      - name: Pull Vercel Config (production)
+        run: yarn vercel pull --yes --environment=production --token=$VERCEL_TOKEN --scope=$VERCEL_SCOPE
+
+      # 6. Build de produção
+      - name: Build Vercel (production)
+        run: yarn vercel build --prod --token=$VERCEL_TOKEN
+
+      # 7. Garante que o build de produção aponta para o Supabase Production
+      - name: Verify Supabase target (production)
+        run: node scripts/check-supabase-target.mjs --dir .vercel/output --expect "$SUPABASE_PROD_PROJECT_ID" --forbid "$SUPABASE_PREVIEW_PROJECT_ID"
+
+      # 8. Deploy em produção
+      - name: Deploy production
+        run: yarn --silent vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN --scope=$VERCEL_SCOPE

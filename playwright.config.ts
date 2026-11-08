@@ -18,6 +18,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 export default defineConfig({
 
   testDir: './playwright/e2e',
+  /* Impede que os testes E2E rodem contra o banco ou o site de produção */
+  globalSetup: './playwright/support/guards/environmentGuard.ts',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
