@@ -1,5 +1,7 @@
 import { Page, expect } from '@playwright/test'
 
+export type OrderResult = 'Pedido Aprovado!' | 'Pedido em Análise!' | 'Crédito Reprovado'
+
 export function createCheckoutActions(page: Page) {
 
   const terms = page.getByTestId('checkout-terms')
@@ -67,6 +69,11 @@ export function createCheckoutActions(page: Page) {
 
     async submit() {
       await page.getByRole('button', { name: 'Confirmar Pedido' }).click()
+    },
+
+    async expectOrderResult(result: OrderResult) {
+      await expect(page).toHaveURL(/\/success/)
+      await expect(page.getByRole('heading', { name: result })).toBeVisible()
     },
   }
 }

@@ -11,6 +11,12 @@ export function createConfiguratorActions(page: Page) {
       await page.goto('/configure')
     },
 
+    async openFromLandingPage() {
+      await page.goto('/')
+      await page.getByRole('link', { name: /Configure Agora/i }).click()
+      await expect(page).toHaveURL(/\/configure$/)
+    },
+
     async selectColor(name: string) {
       await page.getByRole('button', { name }).click()
     },
