@@ -89,7 +89,8 @@ jobs:
   e2e-tests:
     name: Run E2E Tests
     needs: [build-and-deploy]
-    runs-on: ubuntu-latest
+    # Playwright 1.58 não suporta o Ubuntu 26.04 (ubuntu-latest atual)
+    runs-on: ubuntu-24.04
 
     steps:
       # 1. Faz checkout do código do repositório
